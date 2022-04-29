@@ -1,21 +1,20 @@
 [package]
-name = "deno-mssql-test"
-version = "0.1.0"
+name = "deno-mssql-query"
+version = "1.0.0"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-tiberius = { version = "0.7", features = ["time"] }
-tokio = { version = "1", features = ["full"] }
-tokio-util = { version = "0.7.0", features = ["compat"] }
-anyhow = "1.0.54"
+anyhow = "1.0"
+futures-util = "0.3"
 libc = "0.2"
-thread-id = "4.0.0"
-lazy_static = "1.4.0"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
-futures-util = "0.3"
+thread-id = "4.0"
+tiberius = { version = "0.7", features = ["time"] }
 time = "0.3"
+tokio = { version = "1", features = ["net", "rt"] }
+tokio-util = { version = "0.7", features = ["compat"] }

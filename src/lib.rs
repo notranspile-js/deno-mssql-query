@@ -1,29 +1,45 @@
+/*
+ * Copyright 2022, alex at staticlibs.net
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 use std::fmt::Display;
 use std::mem;
 use std::slice;
 use std::str;
 use std::vec::Vec;
-use time::{Date, OffsetDateTime, PrimitiveDateTime, Time};
 use futures_util::TryStreamExt;
-use lazy_static::lazy_static;
 use libc;
+use serde::ser::Serialize;
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
-use serde::ser::Serialize;
 use tiberius::{AuthMethod, Client, Config, FromSql, QueryItem, Row, ColumnType};
+use time::{Date, OffsetDateTime, PrimitiveDateTime, Time};
 use tokio::net::TcpStream;
+use tokio::runtime::Runtime;
 use tokio_util::compat::Compat;
 use tokio_util::compat::TokioAsyncWriteCompatExt;
 
 struct Connection {
     thread_id: usize,
+    runtime: Runtime,
     client: Client<Compat<TcpStream>>,
 }
 
 impl Connection {
-    fn new(client: Client<Compat<TcpStream>>) -> Connection {
-        Connection { thread_id: thread_id::get(), client }
+    fn new(runtime: Runtime, client: Client<Compat<TcpStream>>) -> Connection {
+        Connection { thread_id: thread_id::get(), runtime, client }
     }
 }
 
@@ -36,7 +52,7 @@ struct ConnectOptions {
     database: String,
     user: String,
     password: String,
-    trustCert: bool
+    trustCert: bool,
 }
 
 #[allow(non_snake_case)]
@@ -59,13 +75,13 @@ impl ConnectResult {
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
 struct CloseOptions {
-    connHandle: String
+    connHandle: String,
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
 struct CloseResult {
-    error: String
+    error: String,
 }
 
 impl CloseResult {
@@ -81,14 +97,7 @@ impl CloseResult {
 #[derive(Serialize, Deserialize)]
 struct QueryOptions {
     connHandle: String,
-    query: String
-}
-
-#[allow(non_snake_case)]
-#[derive(Serialize, Deserialize)]
-struct QueryColumn {
-    name: String,
-    typename: String
+    query: String,
 }
 
 #[allow(non_snake_case)]
@@ -96,7 +105,7 @@ struct QueryColumn {
 struct QueryResult {
     error: String,
     metadata: Vec<String>,
-    data: Vec<Vec<String>>
+    data: Vec<Vec<String>>,
 }
 
 impl QueryResult {
@@ -110,12 +119,8 @@ impl QueryResult {
     }
 }
 
-lazy_static! {
-    static ref TOKIO_RUNTIME: tokio::runtime::Runtime = tokio::runtime::Runtime::new().unwrap();
-}
-
-fn connect(opts: &ConnectOptions) -> anyhow::Result<Client<Compat<TcpStream>>> {
-    TOKIO_RUNTIME.block_on(async {
+fn connect(runtime: &Runtime, opts: &ConnectOptions) -> anyhow::Result<Client<Compat<TcpStream>>> {
+    runtime.block_on(async {
         let mut config = Config::new();
         config.host(&opts.host);
         config.port(opts.port);
@@ -136,12 +141,12 @@ fn get_string<'a, T>(row: &'a Row, idx: usize) -> Option<String>
     where T: FromSql<'a> + Display
 {
     match row.try_get::<'a, T, usize>(idx) {
-       Err(_) => None,
-       Ok(opt) => match opt {
-           None => None,
-           Some(val) => Some(val.to_string())
-       }
-   }
+        Err(_) => None,
+        Ok(opt) => match opt {
+            None => None,
+            Some(val) => Some(val.to_string())
+        }
+    }
 }
 
 fn row_to_vec(row: &Row) -> anyhow::Result<Vec<String>> {
@@ -162,11 +167,11 @@ fn row_to_vec(row: &Row) -> anyhow::Result<Vec<String>> {
             ColumnType::Datetime => get_string::<PrimitiveDateTime>(row, i),
             ColumnType::Money4 => None,
             ColumnType::Guid => None,
-            ColumnType::Intn => None,
-            ColumnType::Bitn => None,
-            ColumnType::Decimaln => None,
-            ColumnType::Numericn => None,
-            ColumnType::Floatn => None,
+            ColumnType::Intn => get_string::<i64>(row, i),
+            ColumnType::Bitn => get_string::<i64>(row, i),
+            ColumnType::Decimaln => get_string::<f64>(row, i),
+            ColumnType::Numericn => get_string::<f64>(row, i),
+            ColumnType::Floatn => get_string::<f64>(row, i),
             ColumnType::Datetimen => get_string::<PrimitiveDateTime>(row, i),
             ColumnType::Daten => get_string::<Date>(row, i),
             ColumnType::Timen => get_string::<Time>(row, i),
@@ -193,8 +198,8 @@ fn row_to_vec(row: &Row) -> anyhow::Result<Vec<String>> {
     Ok(res)
 }
 
-fn execute(client: &mut Client<Compat<TcpStream>>, query: &str) -> anyhow::Result<QueryResult> {
-    TOKIO_RUNTIME.block_on(async {
+fn execute(runtime: &Runtime, client: &mut Client<Compat<TcpStream>>, query: &str) -> anyhow::Result<QueryResult> {
+    runtime.block_on(async {
         let mut stream = client.query(query, &[]).await?;
         let mut meta: Vec<String> = Vec::new();
         let mut data: Vec<Vec<String>> = Vec::new();
@@ -236,9 +241,9 @@ fn check_thread(tid: usize) -> Option<String> {
     let cid = thread_id::get();
     if tid != cid {
         Some(format!(concat!(
-            "Invalid thread, id: [{}],",
-                " database operations on this connection can only be",
-                " performed on thread, id: [{}]"), cid, tid))
+        "Invalid thread, id: [{}],",
+        " database operations on this connection can only be",
+        " performed on thread, id: [{}]"), cid, tid))
     } else {
         None
     }
@@ -250,17 +255,23 @@ fn mssql_open_connection(ptr: *const u8, len: usize) -> *const u8 {
     let slice: &[u8] = unsafe { slice::from_raw_parts(ptr, len) };
     let res = match serde_json::from_slice::<ConnectOptions>(slice) {
         Err(e) => ConnectResult::new_error(format!(concat!(
-            "MSSQL database connection error, cannot parse specified options,",
-                " message: [{}]"), e)),
-        Ok(opts) => match connect(&opts) {
-            Ok(client) => {
-                let conn = Connection::new(client);
-                let bx = Box::new(conn);
-                let handle = Box::<Connection>::into_raw(bx) as usize;
-                ConnectResult::new(handle)
-            },
-            Err(e) => ConnectResult::new_error(format!(concat!(
+        "MSSQL database connection error, cannot parse specified options,",
+        " message: [{}]"), e)),
+        Ok(opts) => match tokio::runtime::Builder::new_current_thread()
+            .enable_io()
+            .build() {
+            Ok(runtime) => match connect(&runtime, &opts) {
+                Ok(client) => {
+                    let conn = Connection::new(runtime, client);
+                    let bx = Box::new(conn);
+                    let handle = Box::<Connection>::into_raw(bx) as usize;
+                    ConnectResult::new(handle)
+                }
+                Err(e) => ConnectResult::new_error(format!(concat!(
                 "MSSQL database connection error, message: [{}]"), e))
+            },
+                Err(e) => ConnectResult::new_error(format!(concat!(
+            "MSSQL database connection error, cannot create IO runtime, message: [{}]"), e))
         }
     };
     ffi_json(&res)
@@ -272,23 +283,23 @@ fn mssql_close_connection(ptr: *const u8, len: usize) -> *const u8 {
     let slice: &[u8] = unsafe { slice::from_raw_parts(ptr, len) };
     let res = match serde_json::from_slice::<CloseOptions>(slice) {
         Err(e) => CloseResult::new_error(format!(concat!(
-            "MSSQL connection close error, cannot parse specified options,",
-                " message: [{}]"), e)),
+        "MSSQL connection close error, cannot parse specified options,",
+        " message: [{}]"), e)),
         Ok(opts) => match opts.connHandle.parse::<usize>() {
-           Err(e) => CloseResult::new_error(format!(concat!(
-               "MSSQL connection close error, cannot parse specified handle,",
-                   " value: [{}], message: [{}]"), opts.connHandle, e)),
-           Ok(num) => {
-               let bx = unsafe { Box::from_raw(num as *mut Connection) };
-               match check_thread(bx.thread_id) {
-                   Some(msg) => CloseResult::new_error(msg),
-                   None => {
-                       mem::drop(bx);
-                       CloseResult::new()
-                   }
-               }
-           }
-       }
+            Err(e) => CloseResult::new_error(format!(concat!(
+            "MSSQL connection close error, cannot parse specified handle,",
+            " value: [{}], message: [{}]"), opts.connHandle, e)),
+            Ok(num) => {
+                let bx = unsafe { Box::from_raw(num as *mut Connection) };
+                match check_thread(bx.thread_id) {
+                    Some(msg) => CloseResult::new_error(msg),
+                    None => {
+                        mem::drop(bx);
+                        CloseResult::new()
+                    }
+                }
+            }
+        }
     };
     ffi_json(&res)
 }
@@ -299,20 +310,20 @@ fn mssql_execute_query(ptr: *const u8, len: usize) -> *const u8 {
     let slice: &[u8] = unsafe { slice::from_raw_parts(ptr, len) };
     let res = match serde_json::from_slice::<QueryOptions>(slice) {
         Err(e) => QueryResult::new_error(format!(concat!(
-            "MSSQL query error, cannot parse specified options,",
-                " message: [{}]"), e)),
+        "MSSQL query error, cannot parse specified options,",
+        " message: [{}]"), e)),
         Ok(opts) => match opts.connHandle.parse::<usize>() {
             Err(e) => QueryResult::new_error(format!(concat!(
-                "MSSQL query error, cannot parse specified handle,",
-                    " value: [{}], message: [{}]"), opts.connHandle, e)),
+            "MSSQL query error, cannot parse specified handle,",
+            " value: [{}], message: [{}]"), opts.connHandle, e)),
             Ok(num) => {
                 let mut bx = unsafe { Box::from_raw(num as *mut Connection) };
                 let res = match check_thread(bx.thread_id) {
                     Some(msg) => QueryResult::new_error(msg),
                     None => {
-                        match execute(&mut bx.client, &opts.query) {
+                        match execute(&bx.runtime, &mut bx.client, &opts.query) {
                             Err(e) => QueryResult::new_error(format!(concat!(
-                                "MSSQL query error, message [{}]"), e)),
+                            "MSSQL query error, message [{}]"), e)),
                             Ok(res) => res
                         }
                     }
