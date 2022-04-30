@@ -1,0 +1,42 @@
+# Copyright 2022, alex at staticlibs.net
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+image: Visual Studio 2013
+
+build: off
+
+install:
+  - curl -LO https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-gnu/rustup-init.exe
+  - rustup-init.exe -y --default-host=x86_64-pc-windows-gnu --no-modify-path
+
+build_script:
+  - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
+  - cargo build --release
+  - rename target\release\deno_mssql_query.dll deno_mssql_query_%APPVEYOR_REPO_TAG_NAME%.dll
+
+artifacts:
+  - path: target\release\deno_mssql_query_%APPVEYOR_REPO_TAG_NAME%.dll
+    name: deno_mssql_query_%APPVEYOR_REPO_TAG_NAME%.dll
+
+deploy:
+  description: "%APPVEYOR_REPO_TAG_NAME%"
+  provider: GitHub
+  auth_token:
+    secure: buCEfuXIKqASLh/f4XY0gZ/OOsipoOJJkaC9sYnx6WRkrv7YBGYpsRzQevImXdGz
+  artifact: deno_mssql_query_%APPVEYOR_REPO_TAG_NAME%.dll
+  draft: false
+  prerelease: false
+  on:
+    branch: master
+    appveyor_repo_tag: true 
