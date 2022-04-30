@@ -24,7 +24,7 @@ use libc;
 use serde::ser::Serialize;
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
-use tiberius::{AuthMethod, Client, Config, FromSql, QueryItem, Row, ColumnType};
+use tiberius::{AuthMethod, Client, Config, FromSql, Query, QueryItem, Row, ColumnType};
 use time::{Date, OffsetDateTime, PrimitiveDateTime, Time};
 use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
@@ -98,6 +98,7 @@ impl CloseResult {
 struct QueryOptions {
     connHandle: String,
     query: String,
+    parameters: Vec<String>
 }
 
 #[allow(non_snake_case)]
@@ -198,9 +199,14 @@ fn row_to_vec(row: &Row) -> anyhow::Result<Vec<String>> {
     Ok(res)
 }
 
-fn execute(runtime: &Runtime, client: &mut Client<Compat<TcpStream>>, query: &str) -> anyhow::Result<QueryResult> {
+fn execute(runtime: &Runtime, client: &mut Client<Compat<TcpStream>>, query: &str,
+        parameters: &Vec<String>) -> anyhow::Result<QueryResult> {
     runtime.block_on(async {
-        let mut stream = client.query(query, &[]).await?;
+        let mut qr = Query::new(query);
+        for par in parameters.iter() {
+            qr.bind(par);
+        }
+        let mut stream = qr.query(client).await?;
         let mut meta: Vec<String> = Vec::new();
         let mut data: Vec<Vec<String>> = Vec::new();
         while let Some(item) = stream.try_next().await? {
@@ -321,7 +327,7 @@ fn mssql_execute_query(ptr: *const u8, len: usize) -> *const u8 {
                 let res = match check_thread(bx.thread_id) {
                     Some(msg) => QueryResult::new_error(msg),
                     None => {
-                        match execute(&bx.runtime, &mut bx.client, &opts.query) {
+                        match execute(&bx.runtime, &mut bx.client, &opts.query, &opts.parameters) {
                             Err(e) => QueryResult::new_error(format!(concat!(
                             "MSSQL query error, message [{}]"), e)),
                             Ok(res) => res

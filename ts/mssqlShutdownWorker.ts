@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-import { QueryOptions, QueryResult } from "./types.ts";
 import callWorker from "./callWorker.ts";
 
-export default async (worker: Worker, opts: QueryOptions): Promise<QueryResult> => {
-  const resp = await callWorker(worker, {
-    executeQuery: opts
+export default async (worker: Worker): Promise<void> => {
+  await callWorker(worker, {
+    shutdown: true,
   });
-  return resp.executeQuery!;
 };

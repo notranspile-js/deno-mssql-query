@@ -18,9 +18,6 @@
 export * as path from "https://deno.land/std@0.135.0/path/mod.ts";
 
 // @ts-ignore extension
-export * as io from "https://deno.land/std@0.135.0/io/mod.ts";
-
-// @ts-ignore extension
 export {
   assert,
   assertEquals,

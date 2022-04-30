@@ -14,25 +14,19 @@
  * limitations under the License.
  */
 
+import { QueryOptions, QueryResult } from "./types.ts";
+import encodeOptions from "./encodeOptions.ts";
 import MssqlSymbols from "./MssqlSymbols.ts";
+import parseResult from "./parseResult.ts";
 
-export default (libPath: string): Deno.DynamicLibrary<MssqlSymbols> => {
-  return Deno.dlopen(libPath, {
-    mssql_open_connection: {
-      parameters: ["pointer", "usize"],
-      result: "pointer",
-    },
-    mssql_close_connection: {
-      parameters: ["pointer", "usize"],
-      result: "pointer",
-    },
-    mssql_execute_query: {
-      parameters: ["pointer", "usize"],
-      result: "pointer",
-    },
-    mssql_free_result: {
-      parameters: ["pointer"],
-      result: "void",
-    },
-  });
+export default (
+  dylib: Deno.DynamicLibrary<MssqlSymbols>,
+  options: QueryOptions,
+): QueryResult => {
+  if (!dylib) {
+    throw new Error("Native library not initialized");
+  }
+  const opts = encodeOptions(options);
+  const ptr = dylib.symbols.mssql_execute_query(opts, opts.length);
+  return parseResult(dylib, ptr);
 };

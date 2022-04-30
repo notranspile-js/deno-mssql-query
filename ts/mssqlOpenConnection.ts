@@ -15,18 +15,11 @@
  */
 
 import { ConnectOptions, ConnectResult } from "./types.ts";
-import encodeOptions from "./encodeOptions.ts";
-import MssqlSymbols from "./MssqlSymbols.ts";
-import parseResult from "./parseResult.ts";
+import callWorker from "./callWorker.ts";
 
-export default (
-  dylib: Deno.DynamicLibrary<MssqlSymbols>,
-  options: ConnectOptions,
-): ConnectResult => {
-  if (!dylib) {
-    throw new Error("Native library not initialized");
-  }
-  const opts = encodeOptions(options);
-  const ptr = dylib.symbols.mssql_open_connection(opts, opts.length);
-  return parseResult(dylib, ptr);
+export default async (worker: Worker, opts: ConnectOptions): Promise<ConnectResult> => {
+  const resp = await callWorker(worker, {
+    openConnection: opts
+  });
+  return resp.openConnection!;
 };

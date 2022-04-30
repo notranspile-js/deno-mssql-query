@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
+import MssqlSymbols from "./MssqlSymbols.ts";
+
 export type CloseOptions = {
   connHandle: string;
-};
-
-export type CloseResult = {
-  error: string;
 };
 
 export type ConnectOptions = {
@@ -34,28 +32,44 @@ export type ConnectOptions = {
 
 export type ConnectResult = {
   handle: string;
-  error: string;
+};
+
+export type LoadLibraryOptions = {
+  libPath: string;
+};
+
+export type LoadLibraryResult = {
+  dylib: Deno.DynamicLibrary<MssqlSymbols>;
 };
 
 export type QueryOptions = {
   connHandle: string;
   query: string;
+  parameters: Array<string>;
 };
 
 export type QueryResult = {
-  error: string;
   metadata: Array<string>;
   data: Array<Array<string>>;
 };
 
+export type VoidResult = {
+  success: true;
+};
+
 export type WorkerRequest = {
-  close?: boolean;
-  connect?: ConnectOptions;
-  libPath?: string;
-  query?: string;
+  closeConnection?: CloseOptions;
+  executeQuery?: QueryOptions;
+  loadLibrary?: LoadLibraryOptions;
+  openConnection?: ConnectOptions;
+  shutdown?: true;
 };
 
 export type WorkerResponse = {
   error?: string;
-  result?: QueryResult;
+  closeConnection?: VoidResult;
+  executeQuery?: QueryResult;
+  loadLibrary?: VoidResult;
+  openConnection?: ConnectResult;
+  shutdown?: VoidResult
 };

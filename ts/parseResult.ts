@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-import { CloseResult, ConnectResult, QueryResult } from "./types.ts";
+import { ConnectResult, QueryResult } from "./types.ts";
 import MssqlSymbols from "./MssqlSymbols.ts";
 
-export default <T extends CloseResult | ConnectResult | QueryResult>(
+export default <T extends ConnectResult | QueryResult>(
   dylib: Deno.DynamicLibrary<MssqlSymbols>,
   ptr: Deno.UnsafePointer,
 ): T => {
@@ -31,5 +31,6 @@ export default <T extends CloseResult | ConnectResult | QueryResult>(
   if (res.error) {
     throw new Error(res.error);
   }
+  delete res.error;
   return res;
 };

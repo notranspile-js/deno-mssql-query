@@ -14,12 +14,19 @@
  * limitations under the License.
  */
 
-import { QueryOptions, QueryResult } from "./types.ts";
-import callWorker from "./callWorker.ts";
+import { CloseOptions } from "./types.ts";
+import MssqlSymbols from "./MssqlSymbols.ts";
+import encodeOptions from "./encodeOptions.ts";
+import parseResult from "./parseResult.ts";
 
-export default async (worker: Worker, opts: QueryOptions): Promise<QueryResult> => {
-  const resp = await callWorker(worker, {
-    executeQuery: opts
-  });
-  return resp.executeQuery!;
+export default (
+  dylib: Deno.DynamicLibrary<MssqlSymbols>,
+  options: CloseOptions,
+): void => {
+  if (!dylib) {
+    throw new Error("Native library not initialized");
+  }
+  const opts = encodeOptions(options);
+  const ptr = dylib.symbols.mssql_close_connection(opts, opts.length);
+  parseResult(dylib, ptr);
 };

@@ -14,12 +14,22 @@
  * limitations under the License.
  */
 
-import { QueryOptions, QueryResult } from "./types.ts";
-import callWorker from "./callWorker.ts";
+import type { WorkerRequest, WorkerResponse } from "./types.ts";
 
-export default async (worker: Worker, opts: QueryOptions): Promise<QueryResult> => {
-  const resp = await callWorker(worker, {
-    executeQuery: opts
+export default async (
+  worker: Worker,
+  req: WorkerRequest,
+): Promise<WorkerResponse> => {
+  const promise = new Promise((resolve, reject) => {
+    worker.onmessage = (e: MessageEvent) => {
+      const res: WorkerResponse = JSON.parse(e.data);
+      if (!res.error) {
+        resolve(res);
+      } else {
+        reject(res.error);
+      }
+    };
   });
-  return resp.executeQuery!;
+  worker.postMessage(JSON.stringify(req));
+  return await promise as WorkerResponse;
 };

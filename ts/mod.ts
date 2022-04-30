@@ -17,22 +17,37 @@
 import mssqlCloseConnection from "./mssqlCloseConnection.ts";
 export { mssqlCloseConnection };
 
+import mssqlCloseConnectionSync from "./mssqlCloseConnectionSync.ts";
+export { mssqlCloseConnectionSync };
+
 import mssqlExecuteQuery from "./mssqlExecuteQuery.ts";
 export { mssqlExecuteQuery };
 
-import mssqlInitialize from "./mssqlInitialize.ts";
-export { mssqlInitialize };
+import mssqlExecuteQuerySync from "./mssqlExecuteQuerySync.ts";
+export { mssqlExecuteQuerySync };
+
+import mssqlLoadLibrary from "./mssqlLoadLibrary.ts";
+export { mssqlLoadLibrary };
+
+import mssqlLoadLibrarySync from "./mssqlLoadLibrarySync.ts";
+export { mssqlLoadLibrarySync };
 
 import mssqlOpenConnection from "./mssqlOpenConnection.ts";
 export { mssqlOpenConnection };
 
+import mssqlOpenConnectionSync from "./mssqlOpenConnectionSync.ts";
+export { mssqlOpenConnectionSync };
+
+import mssqlShutdownWorker from "./mssqlShutdownWorker.ts";
+export { mssqlShutdownWorker };
+
 export type {
   CloseOptions,
-  CloseResult,
   ConnectOptions,
   ConnectResult,
+  LoadLibraryOptions,
+  LoadLibraryResult,
   QueryOptions,
   QueryResult,
-  WorkerRequest,
-  WorkerResponse,
+  VoidResult,
 } from "./types.ts";
