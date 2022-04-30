@@ -1,4 +1,4 @@
-Windows SCM Deno plugin
+MSSQL queries from Deno
 =======================
 
 [![appveyor](https://ci.appveyor.com/api/projects/status/github/notranspile-js/deno-mssql-query?svg=true)](https://ci.appveyor.com/project/staticlibs/deno-mssql-query)
