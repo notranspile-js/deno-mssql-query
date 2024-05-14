@@ -169,7 +169,7 @@ fn row_to_vec(row: &Row) -> anyhow::Result<Vec<String>> {
             ColumnType::Money4 => None,
             ColumnType::Guid => None,
             ColumnType::Intn => get_string::<i64>(row, i),
-            ColumnType::Bitn => get_string::<i64>(row, i),
+            ColumnType::Bitn => get_string::<bool>(row, i),
             ColumnType::Decimaln => get_string::<f64>(row, i),
             ColumnType::Numericn => get_string::<f64>(row, i),
             ColumnType::Floatn => get_string::<f64>(row, i),
